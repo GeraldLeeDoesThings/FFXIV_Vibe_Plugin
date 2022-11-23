@@ -3,13 +3,16 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Plugin;
 using FFXIV_Vibe_Plugin.Commons;
+using FFXIV_Vibe_Plugin.Triggers;
 using ImGuiNET;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 namespace FFXIV_Vibe_Plugin {
 
@@ -73,6 +76,7 @@ namespace FFXIV_Vibe_Plugin {
     // Trigger
     private Triggers.Trigger? SelectedTrigger = null;
     private string triggersViewMode = "default"; // default|edit|delete;
+    string _tmp_exportPatternResponse = "";
 
     /** Constructor */
     public PluginUI(
@@ -333,7 +337,27 @@ namespace FFXIV_Vibe_Plugin {
       }
       ImGui.EndChild();
 
-      if(this.ConfigurationProfile.VERBOSE_CHAT || this.ConfigurationProfile.VERBOSE_SPELL) {
+      ImGui.TextColored(ImGuiColors.DalamudViolet, "Export Settings");
+      ImGui.BeginChild("###EXPORT_OPTIONS_ZONE", new Vector2(-1, 50f), true);
+      {
+        // Init table
+        ImGui.BeginTable("###EXPORT_OPTIONS_TABLE", 2);
+
+        ImGui.TableSetupColumn("###EXPORT_OPTIONS_TABLE_COL1", ImGuiTableColumnFlags.WidthFixed, 250);
+        ImGui.TableSetupColumn("###EXPORT_OPTIONS_TABLE_COL2", ImGuiTableColumnFlags.WidthStretch);
+
+        ImGui.TableNextColumn();
+        ImGui.Text("Trigger Export Directory:");
+        ImGui.TableNextColumn();
+        if (ImGui.InputText("###EXPORT_DIRECTORY_INPUT", ref this.ConfigurationProfile.EXPORT_DIR, 200)) {
+          this.Configuration.EXPORT_DIR = this.ConfigurationProfile.EXPORT_DIR;
+          this.Configuration.Save();
+        }
+        ImGui.EndTable();
+      }
+      ImGui.EndChild();
+
+      if (this.ConfigurationProfile.VERBOSE_CHAT || this.ConfigurationProfile.VERBOSE_SPELL) {
         ImGui.TextColored(ImGuiColors.DalamudOrange, "Please, disabled chat and spell logs for better ingame performance.");
       }
     }
@@ -775,6 +799,31 @@ namespace FFXIV_Vibe_Plugin {
               ImGui.TableNextRow();
             }
             ImGui.EndTable();
+            ImGui.Separator();
+
+            if (ImGui.Button("Export")) {
+              if (this.ConfigurationProfile.EXPORT_DIR.Equals("")) {
+                this._tmp_exportPatternResponse = "No export directory has been set! Set one in Options.";
+              }
+              else {
+                try {
+                  File.WriteAllText(
+                    Path.Join(this.ConfigurationProfile.EXPORT_DIR, $"{this.SelectedTrigger.Id}.json"),
+                    JsonConvert.SerializeObject(this.SelectedTrigger, Formatting.Indented)
+                  );
+                  this._tmp_exportPatternResponse = "Successfully exported trigger!";
+                }
+                catch (Exception ex) {
+                  // Just eat the exception
+                  this._tmp_exportPatternResponse = "Something went wrong while exporting!";
+                }
+              }
+            }
+            ImGui.SameLine();
+            ImGuiComponents.HelpMarker("Writes this trigger to your export directory.");
+            ImGui.SameLine();
+            ImGui.Text($"{this._tmp_exportPatternResponse}");
+            ImGui.Separator();
 
             ImGui.TextColored(ImGuiColors.DalamudViolet, "Actions & Devices");
             ImGui.Separator();
@@ -977,6 +1026,17 @@ namespace FFXIV_Vibe_Plugin {
       ImGui.SameLine();
       if(ImGui.Button("Delete")) {
         this.triggersViewMode = "delete";
+      }
+      ImGui.SameLine();
+      if(ImGui.Button("Load Triggers")) {
+        if(!this.ConfigurationProfile.EXPORT_DIR.Equals("")) { 
+          try {
+            foreach (var filename in Directory.GetFiles(this.ConfigurationProfile.EXPORT_DIR)) {
+              this.TriggerController.AddTrigger(JsonConvert.DeserializeObject<Trigger>(File.ReadAllText(filename)));
+            }
+          }
+          catch { }
+        }
       }
 
     }

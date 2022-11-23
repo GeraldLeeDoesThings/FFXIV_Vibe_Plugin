@@ -28,6 +28,7 @@ namespace FFXIV_Vibe_Plugin {
     public List<Pattern> PatternList = new();
     public string BUTTPLUG_SERVER_HOST { get; set; } = "127.0.0.1";
     public int BUTTPLUG_SERVER_PORT { get; set; } = 12345;
+    public string EXPORT_DIR = "";
     public List<Triggers.Trigger> TRIGGERS { get; set; } = new();
     public Dictionary<string, FFXIV_Vibe_Plugin.Device.Device> VISITED_DEVICES = new();
 
@@ -120,6 +121,8 @@ namespace FFXIV_Vibe_Plugin {
 
     public string BUTTPLUG_SERVER_HOST { get; set; } = "127.0.0.1";
     public int BUTTPLUG_SERVER_PORT { get; set; } = 12345;
+
+    public string EXPORT_DIR = "";
 
     public List<Triggers.Trigger> TRIGGERS { get; set; } = new();
 
