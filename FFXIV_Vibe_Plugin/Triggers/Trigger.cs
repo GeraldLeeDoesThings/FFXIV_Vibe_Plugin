@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -20,7 +21,7 @@ namespace FFXIV_Vibe_Plugin.Triggers {
     Self
   }
 
-  public class Trigger : IComparable<Trigger> {
+  public class Trigger : IComparable<Trigger>, IEquatable<Trigger> {
     private static readonly int _initAmountMinValue = -1;
     private static readonly int _initAmountMaxValue = 10000000;
 
@@ -49,8 +50,10 @@ namespace FFXIV_Vibe_Plugin.Triggers {
     public List<TriggerDevice> Devices = new();
 
     public Trigger(string name) {
-      this.Id = Guid.NewGuid().ToString();
       this.Name = name;
+      byte[] textBytes = System.Text.Encoding.UTF8.GetBytes(name);
+      byte[] hashed = SHA256.Create().ComputeHash(textBytes);
+      this.Id = BitConverter.ToString(hashed).Replace("-", String.Empty);
     }
 
     public override string ToString() {
@@ -59,13 +62,7 @@ namespace FFXIV_Vibe_Plugin.Triggers {
 
     public int CompareTo(Trigger? other) {
       if(other == null) { return 1; }
-      if(this.SortOder < other.SortOder) {
-        return 1;
-      } else if(this.SortOder > other.SortOder) {
-        return -1;
-      } else {
-        return 0;
-      }
+      return other.Name.CompareTo(this.Name);
     }
 
     public string GetShortID() {
@@ -75,6 +72,11 @@ namespace FFXIV_Vibe_Plugin.Triggers {
     public void Reset() {
       this.AmountMaxValue = Trigger._initAmountMaxValue;
       this.AmountMinValue = Trigger._initAmountMinValue;
+    }
+
+    public bool Equals(Trigger? other) {
+      if (other == null) return false;
+      return this.Name.Equals(other.Name);
     }
   }
 

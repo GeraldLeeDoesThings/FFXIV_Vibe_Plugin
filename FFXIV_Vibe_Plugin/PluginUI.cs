@@ -105,6 +105,24 @@ namespace FFXIV_Vibe_Plugin {
       this._expandedOnce = false;
     }
 
+    public string export_trigger(Trigger trigger) {
+      if (this.ConfigurationProfile.EXPORT_DIR.Equals("")) {
+        return "No export directory has been set! Set one in Options.";
+      }
+      else {
+        try {
+          File.WriteAllText(
+            Path.Join(this.ConfigurationProfile.EXPORT_DIR, $"{trigger.Name}.json"),
+            JsonConvert.SerializeObject(trigger, Formatting.Indented)
+          );
+          return "Successfully exported trigger!";
+        }
+        catch {
+          return "Something went wrong while exporting!";
+        }
+      }
+    }
+
     /**
      * Function that will load all the images so that they are usable.
      * Don't forget to add the image into the project file.
@@ -337,8 +355,8 @@ namespace FFXIV_Vibe_Plugin {
       }
       ImGui.EndChild();
 
-      ImGui.TextColored(ImGuiColors.DalamudViolet, "Export Settings");
-      ImGui.BeginChild("###EXPORT_OPTIONS_ZONE", new Vector2(-1, 50f), true);
+      ImGui.TextColored(ImGuiColors.DalamudViolet, "Trigger Import/Export Settings");
+      ImGui.BeginChild("###EXPORT_OPTIONS_ZONE", new Vector2(-1, 100f), true);
       {
         // Init table
         ImGui.BeginTable("###EXPORT_OPTIONS_TABLE", 2);
@@ -347,12 +365,26 @@ namespace FFXIV_Vibe_Plugin {
         ImGui.TableSetupColumn("###EXPORT_OPTIONS_TABLE_COL2", ImGuiTableColumnFlags.WidthStretch);
 
         ImGui.TableNextColumn();
-        ImGui.Text("Trigger Export Directory:");
+        ImGui.Text("Trigger Import/Export Directory:");
         ImGui.TableNextColumn();
         if (ImGui.InputText("###EXPORT_DIRECTORY_INPUT", ref this.ConfigurationProfile.EXPORT_DIR, 200)) {
           this.Configuration.EXPORT_DIR = this.ConfigurationProfile.EXPORT_DIR;
           this.Configuration.Save();
         }
+        ImGui.TableNextRow();
+        ImGui.TableNextColumn();
+        if (ImGui.Button("Clear Import/Export Directory")) {
+          if (!this.ConfigurationProfile.EXPORT_DIR.Equals("")) {
+            try {
+              foreach (var filename in Directory.GetFiles(this.ConfigurationProfile.EXPORT_DIR)) {
+                File.Delete(filename);
+              }
+            }
+            catch { }
+          }
+        }
+        ImGui.SameLine();
+        ImGuiComponents.HelpMarker("Deletes ALL files in the Import/Export Directory.");
         ImGui.EndTable();
       }
       ImGui.EndChild();
@@ -802,22 +834,7 @@ namespace FFXIV_Vibe_Plugin {
             ImGui.Separator();
 
             if (ImGui.Button("Export")) {
-              if (this.ConfigurationProfile.EXPORT_DIR.Equals("")) {
-                this._tmp_exportPatternResponse = "No export directory has been set! Set one in Options.";
-              }
-              else {
-                try {
-                  File.WriteAllText(
-                    Path.Join(this.ConfigurationProfile.EXPORT_DIR, $"{this.SelectedTrigger.Id}.json"),
-                    JsonConvert.SerializeObject(this.SelectedTrigger, Formatting.Indented)
-                  );
-                  this._tmp_exportPatternResponse = "Successfully exported trigger!";
-                }
-                catch (Exception ex) {
-                  // Just eat the exception
-                  this._tmp_exportPatternResponse = "Something went wrong while exporting!";
-                }
-              }
+              this._tmp_exportPatternResponse = export_trigger(SelectedTrigger);
             }
             ImGui.SameLine();
             ImGuiComponents.HelpMarker("Writes this trigger to your export directory.");
@@ -1017,7 +1034,12 @@ namespace FFXIV_Vibe_Plugin {
       }
 
       if(ImGui.Button("Add")) {
-        Triggers.Trigger trigger = new("New Trigger");
+        int index = 0;
+        Triggers.Trigger trigger = new($"New Trigger {index}");
+        while (this.TriggerController.GetTriggers().Contains(trigger)) {
+          index++;
+          trigger = new($"New Trigger {index}");
+        }
         this.TriggerController.AddTrigger(trigger);
         this.SelectedTrigger = trigger;
         this.triggersViewMode = "edit";
@@ -1028,14 +1050,26 @@ namespace FFXIV_Vibe_Plugin {
         this.triggersViewMode = "delete";
       }
       ImGui.SameLine();
-      if(ImGui.Button("Load Triggers")) {
+      if(ImGui.Button("Import Triggers")) {
         if(!this.ConfigurationProfile.EXPORT_DIR.Equals("")) { 
           try {
             foreach (var filename in Directory.GetFiles(this.ConfigurationProfile.EXPORT_DIR)) {
-              this.TriggerController.AddTrigger(JsonConvert.DeserializeObject<Trigger>(File.ReadAllText(filename)));
+              Trigger t = JsonConvert.DeserializeObject<Trigger>(File.ReadAllText(filename));
+              // Remove any triggers with the same name due to .Equals override
+              this.TriggerController.RemoveTrigger(t);
+              // Import the new trigger
+              this.TriggerController.AddTrigger(t);  
             }
           }
           catch { }
+        }
+      }
+      ImGui.SameLine();
+      if(ImGui.Button("Export All")) {
+        if(!this.ConfigurationProfile.EXPORT_DIR.Equals("")) {
+          foreach (Trigger t in this.TriggerController.GetTriggers()) {
+            export_trigger(t);
+          }
         }
       }
 
